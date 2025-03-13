@@ -10,21 +10,25 @@ jobs:
     runs-on: macos-latest
 
     steps:
+      # 1) Set up Python 3.10
       - name: Set up Python 3.10
         uses: actions/setup-python@v4
         with:
           python-version: "3.10"
 
+      # 2) Checkout Your Repo
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install system dependencies & configure Git
+      # 3) Install System Deps & Configure Git
+      - name: Install system dependencies
         run: |
           brew update
           brew install git autoconf automake libtool pkg-config
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
 
+      # 4) Create a Virtual Env & Install Buildozer / Cython
       - name: Create venv & install Buildozer
         run: |
           python -m venv venv
@@ -32,16 +36,17 @@ jobs:
           pip install --upgrade pip
           pip install buildozer cython
 
-      # 🔥 Remove trailing slash from .git
+      # 5) Manually Clone the pbxproj Repo (now mod-pbxproj) & Install
       - name: Manually clone pbxproj
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           source venv/bin/activate
-          # Use the correct URL (no slash) and GitHub Actions token
-          git clone https://$GITHUB_ACTOR:${GH_TOKEN}@github.com/kronenthaler/python-pbxproj.git pbxproj_src
+          # Correct repo name: mod-pbxproj.git
+          git clone https://$GITHUB_ACTOR:${GH_TOKEN}@github.com/kronenthaler/mod-pbxproj.git pbxproj_src
           pip install ./pbxproj_src
 
+      # 6) Prepare Buildozer
       - name: Prepare Buildozer
         run: |
           source venv/bin/activate
@@ -49,11 +54,13 @@ jobs:
           sed -i '' 's/android/ios/' buildozer.spec
           sed -i '' 's/# requirements = python3,kivy/requirements = python3,kivy/' buildozer.spec
 
+      # 7) Build .ipa File
       - name: Build .ipa File
         run: |
           source venv/bin/activate
           buildozer --log-level=2 -v ios debug
 
+      # 8) Upload .ipa Artifact
       - name: Upload .ipa
         uses: actions/upload-artifact@v4
         with:
