@@ -10,17 +10,17 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      # 1) Use Python 3.10 (has distutils)
+      # 1) Use Python 3.10
       - name: Set up Python 3.10
         uses: actions/setup-python@v4
         with:
           python-version: "3.10"
 
-      # 2) Checkout code
+      # 2) Checkout
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 3) Install system dependencies & configure Git
+      # 3) Install system deps & configure Git
       - name: Install system dependencies
         run: |
           brew update
@@ -36,7 +36,7 @@ jobs:
           pip install --upgrade pip
           pip install buildozer cython
 
-      # 5) Manually clone pbxproj (mod-pbxproj) & install from local
+      # 5) Manually clone mod-pbxproj & install
       - name: Manually clone pbxproj
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -53,30 +53,34 @@ jobs:
           # Force iOS in buildozer.spec
           sed -i '' 's/android/ios/' buildozer.spec
           sed -i '' 's/# requirements = python3,kivy/requirements = python3,kivy/' buildozer.spec
-          # Add ios-deploy to iOS deps
+          # Add ios-deploy
           echo "ios.kivy_ios_deps = ios-deploy" >> buildozer.spec
           echo "ios.kivy_ios_reqs = ios-deploy" >> buildozer.spec
-          # Force codesign off for debug
+          # Force code signing off for debug
           sed -i '' 's/# ios.codesign.force = False/ios.codesign.force = True/' buildozer.spec
           sed -i '' 's/# ios.codesign.debug = True/ios.codesign.debug = False/' buildozer.spec
-          # Only build current arch (arm64), skip x86_64
+          # Only build current arch (arm64)
           echo "ios.xcodebuild.env = ONLY_ACTIVE_ARCH=YES" >> buildozer.spec
 
-      # 7) Build .ipa, removing macOS references from ios-deploy
+      # 7) Build .ipa, forcibly removing macOS references from ios-deploy
       - name: Build .ipa File
         run: |
           source venv/bin/activate
-          # First, let Buildozer fetch iOS deps
+
+          # 7a) Let Buildozer fetch ios-deploy code
           buildozer ios update
-          
-          # Remove 'macosx' references from ios-deploy project
-          #  - Removes deployment target references like macOS 10.11
-          #  - Strips out x86_64 arch lines
-          sed -i '' 's/macOS 10.11/macOS 10.13/g;s/macOS 10.8/macOS 10.13/g' .buildozer/ios/platform/ios-deploy/ios-deploy.xcodeproj/project.pbxproj
-          sed -i '' 's/SUPPORTED_PLATFORMS = macosx;//g' .buildozer/ios/platform/ios-deploy/ios-deploy.xcodeproj/project.pbxproj
-          sed -i '' 's/x86_64//g' .buildozer/ios/platform/ios-deploy/ios-deploy.xcodeproj/project.pbxproj
-          
-          # Now do the full iOS build
+
+          # 7b) Patch the ios-deploy.xcodeproj to remove x86_64 + macOS lines
+          #     This is "nuclear" but ensures we only build arm64 for iOS.
+          cd .buildozer/ios/platform/ios-deploy/ios-deploy.xcodeproj
+          # Remove lines referencing macosx or x86_64
+          sed -i '' '/macosx/d' project.pbxproj
+          sed -i '' '/x86_64/d' project.pbxproj
+          sed -i '' 's/MACOSX_DEPLOYMENT_TARGET = 10.8;/IPHONEOS_DEPLOYMENT_TARGET = 14.0;/g' project.pbxproj
+          sed -i '' 's/MACOSX_DEPLOYMENT_TARGET = 10.11;/IPHONEOS_DEPLOYMENT_TARGET = 14.0;/g' project.pbxproj
+          cd -
+
+          # 7c) Now do the full build
           buildozer --log-level=2 -v ios debug
 
       # 8) Upload .ipa
