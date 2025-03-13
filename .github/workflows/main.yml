@@ -1,0 +1,32 @@
+name: Build iOS App
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Install Buildozer
+        run: |
+          pip3 install --upgrade buildozer cython
+
+      - name: Prepare Buildozer
+        run: |
+          buildozer init
+          sed -i '' 's/android/ios/' buildozer.spec
+          sed -i '' 's/# requirements = python3,kivy/requirements = python3,kivy/' buildozer.spec
+
+      - name: Build .ipa File
+        run: buildozer -v ios debug
+
+      - name: Upload .ipa
+        uses: actions/upload-artifact@v2
+        with:
+          name: ToDoApp.ipa
+          path: bin/
