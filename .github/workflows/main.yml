@@ -10,25 +10,25 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      # 1) Set up Python 3.10
+      # 1) Use Python 3.10 (Buildozer fails on 3.12 because of missing distutils)
       - name: Set up Python 3.10
         uses: actions/setup-python@v4
         with:
           python-version: "3.10"
 
-      # 2) Checkout Your Repo
+      # 2) Check out your repository code
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 3) Install System Deps & Configure Git
+      # 3) Install system dependencies & configure Git
       - name: Install system dependencies
         run: |
           brew update
-          brew install git autoconf automake libtool pkg-config
+          brew install git autoconf automake libtool pkg-config ios-deploy
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
 
-      # 4) Create a Virtual Env & Install Buildozer / Cython
+      # 4) Create a Python venv, install Buildozer & Cython
       - name: Create venv & install Buildozer
         run: |
           python -m venv venv
@@ -36,31 +36,38 @@ jobs:
           pip install --upgrade pip
           pip install buildozer cython
 
-      # 5) Manually Clone the pbxproj Repo (now mod-pbxproj) & Install
+      # 5) Manually clone mod-pbxproj (formerly python-pbxproj) & install from local
       - name: Manually clone pbxproj
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           source venv/bin/activate
-          # Correct repo name: mod-pbxproj.git
           git clone https://$GITHUB_ACTOR:${GH_TOKEN}@github.com/kronenthaler/mod-pbxproj.git pbxproj_src
           pip install ./pbxproj_src
 
-      # 6) Prepare Buildozer
+      # 6) Prepare Buildozer (init .spec, force iOS, add dependencies & codesign)
       - name: Prepare Buildozer
         run: |
           source venv/bin/activate
           buildozer init
+          # Force iOS instead of Android
           sed -i '' 's/android/ios/' buildozer.spec
+          # Ensure Kivy is in requirements
           sed -i '' 's/# requirements = python3,kivy/requirements = python3,kivy/' buildozer.spec
+          # Add ios-deploy to iOS dependencies
+          echo "ios.kivy_ios_deps = ios-deploy" >> buildozer.spec
+          echo "ios.kivy_ios_reqs = ios-deploy" >> buildozer.spec
+          # Force code signing off debug (some iOS builds require codesign anyway)
+          sed -i '' 's/# ios.codesign.force = False/ios.codesign.force = True/' buildozer.spec
+          sed -i '' 's/# ios.codesign.debug = True/ios.codesign.debug = False/' buildozer.spec
 
-      # 7) Build .ipa File
+      # 7) Build the .ipa File (iOS debug)
       - name: Build .ipa File
         run: |
           source venv/bin/activate
           buildozer --log-level=2 -v ios debug
 
-      # 8) Upload .ipa Artifact
+      # 8) Upload the .ipa artifact to GitHub Actions
       - name: Upload .ipa
         uses: actions/upload-artifact@v4
         with:
