@@ -10,49 +10,51 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      # 1) Set up Python 3.10 (avoids missing distutils issues with Python 3.12+)
+      # 1) Set up Python 3.10
       - name: Set up Python 3.10
         uses: actions/setup-python@v4
         with:
           python-version: "3.10"
 
-      # 2) Check out your repository code
+      # 2) Check out your repo
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 3) Install system dependencies via Homebrew
+      # 3) Install system deps & configure Git
       - name: Install system dependencies
         run: |
           brew update
-          brew install autoconf automake libtool pkg-config
+          brew install git autoconf automake libtool pkg-config
+          # Configure Git user info to avoid "fatal: could not read Username"
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
 
-      # 4) Create a venv and install Buildozer + "pbxproj" from GitHub
-      - name: Create a Python venv and install Buildozer + pbxproj
+      # 4) Create a venv, install Buildozer, Cython, and pbxproj from GitHub
+      - name: Create venv & install Buildozer + pbxproj
         run: |
           python -m venv venv
           source venv/bin/activate
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           # Install Buildozer & Cython from PyPI
           pip install buildozer cython
-          # Install pbxproj from GitHub (since PyPI doesn't have an ARM64 wheel)
+          # Install pbxproj from source (GitHub)
           pip install git+https://github.com/kronenthaler/python-pbxproj.git@master
 
-      # 5) Prepare Buildozer (Optional: tweak buildozer.spec)
+      # 5) Prepare Buildozer
       - name: Prepare Buildozer
         run: |
           source venv/bin/activate
           buildozer init
-          # Example: Force target iOS & basic requirements in buildozer.spec
           sed -i '' 's/android/ios/' buildozer.spec
           sed -i '' 's/# requirements = python3,kivy/requirements = python3,kivy/' buildozer.spec
 
-      # 6) Build the .ipa file
+      # 6) Build the .ipa file (iOS debug)
       - name: Build .ipa File
         run: |
           source venv/bin/activate
           buildozer --log-level=2 -v ios debug
 
-      # 7) Upload the .ipa artifact to GitHub Actions
+      # 7) Upload .ipa artifact
       - name: Upload .ipa
         uses: actions/upload-artifact@v4
         with:
