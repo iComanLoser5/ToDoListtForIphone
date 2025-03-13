@@ -9,12 +9,18 @@ jobs:
   build-ios:
     runs-on: macos-latest
     steps:
+      # 1) Choose Python 3.10 (avoids missing distutils in Python 3.12+)
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
       - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Create a Python venv and install Buildozer
         run: |
-          python3 -m venv venv
+          python -m venv venv
           source venv/bin/activate
           pip install --upgrade pip
           pip install buildozer cython
@@ -23,6 +29,7 @@ jobs:
         run: |
           source venv/bin/activate
           buildozer init
+          # Example: override default spec to iOS & add basic requirements
           sed -i '' 's/android/ios/' buildozer.spec
           sed -i '' 's/# requirements = python3,kivy/requirements = python3,kivy/' buildozer.spec
 
