@@ -20,41 +20,46 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 3) Install system deps & configure Git
+      # 3) Install system dependencies & configure Git
       - name: Install system dependencies
         run: |
           brew update
           brew install git autoconf automake libtool pkg-config
-          # Configure Git user info to avoid "fatal: could not read Username"
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
 
-      # 4) Create a venv, install Buildozer, Cython, and pbxproj from GitHub
-      - name: Create venv & install Buildozer + pbxproj
+      # 4) Create a venv, install Buildozer & Cython
+      - name: Create venv & install Buildozer
         run: |
           python -m venv venv
           source venv/bin/activate
-          python -m pip install --upgrade pip
-          # Install Buildozer & Cython from PyPI
+          pip install --upgrade pip
           pip install buildozer cython
-          # Install pbxproj from source (GitHub)
-          pip install git+https://github.com/kronenthaler/python-pbxproj.git@master
 
-      # 5) Prepare Buildozer
+      # 5) Manually clone pbxproj then pip-install from local folder
+      - name: Manually clone pbxproj
+        run: |
+          export GIT_TERMINAL_PROMPT=0
+          git clone https://github.com/kronenthaler/python-pbxproj.git pbxproj_src
+          source venv/bin/activate
+          pip install ./pbxproj_src
+
+      # 6) Prepare Buildozer
       - name: Prepare Buildozer
         run: |
           source venv/bin/activate
           buildozer init
+          # Force iOS + basic requirements in buildozer.spec
           sed -i '' 's/android/ios/' buildozer.spec
           sed -i '' 's/# requirements = python3,kivy/requirements = python3,kivy/' buildozer.spec
 
-      # 6) Build the .ipa file (iOS debug)
+      # 7) Build the .ipa file (iOS debug)
       - name: Build .ipa File
         run: |
           source venv/bin/activate
           buildozer --log-level=2 -v ios debug
 
-      # 7) Upload .ipa artifact
+      # 8) Upload .ipa artifact
       - name: Upload .ipa
         uses: actions/upload-artifact@v4
         with:
